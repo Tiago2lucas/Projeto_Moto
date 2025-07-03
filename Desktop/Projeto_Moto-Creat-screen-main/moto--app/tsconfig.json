@@ -1,0 +1,14 @@
+{
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "strict": true,
+    "baseUrl": "./",
+    "paths": {
+      "@/*": ["src/*"]
+    },
+    "jsx": "react-native",
+    "esModuleInterop": true,  // <--- ESSA LINHA É CRUCIAL PARA O ERRO TS1259
+    "skipLibCheck": true,     // <--- AJUDA A EVITAR PROBLEMAS COM TIPAGEM DE BIBLIOTECAS
+    "forceConsistentCasingInFileNames": true // Boa prática
+  }
+}

@@ -8,42 +8,55 @@ import {
 import * as Location from 'expo-location';
 import * as ImagePicker from 'expo-image-picker';
 import { AntDesign, MaterialIcons } from '@expo/vector-icons';
-import { TireShop } from '../types/interface'; // Importar o tipo atualizado
+// A interface TireShop não será mais usada diretamente para o payload do backend,
+// pois o payload será mapeado diretamente para as colunas do DB.
+// import { TireShop } from '../types/interface';
 
 interface AddLocationScreenProps {
   onGoBack: () => void;
   onLocationAdded: () => void;
 }
 
+// Defina a URL base do seu backend aqui.
+// IMPORTANTE:
+// - Para emuladores Android, use 'http://10.0.2.2:3000'
+// - Para dispositivos físicos (celular real), use o ENDEREÇO IP DA SUA MÁQUINA
+//   na rede local (ex: 'http://192.168.1.14:3000').
+//   Certifique-se de que seu celular e computador estejam na mesma rede Wi-Fi.
+// Escolha a URL apropriada para o seu ambiente de teste:
+const API_BASE_URL = 'http://192.168.1.14:3000'; // Exemplo: para dispositivo físico (seu IP encontrado)
+// const API_BASE_URL = 'http://10.0.2.2:3000'; // Exemplo: para emulador Android
+
 export const AddLocationScreen: React.FC<AddLocationScreenProps> = ({ onGoBack, onLocationAdded }) => {
-  // Campos de texto
+  // Campos de texto do formulário
   const [nomeLocal, setNomeLocal] = useState('');
   const [cep, setCep] = useState('');
   const [numero, setNumero] = useState('');
-  const [enderecoCompleto, setEnderecoCompleto] = useState(''); // Rua, Bairro, Cidade - UF
+  // enderecoCompleto é para exibição, os campos ViaCEP são para o backend
+  const [enderecoCompleto, setEnderecoCompleto] = useState('');
   const [pontoDeReferenciaSimplificado, setPontoDeReferenciaSimplificado] = useState('');
   const [telefoneObrigatorio, setTelefoneObrigatorio] = useState('');
-  const [whatsappNumber, setWhatsappNumber] = useState(''); // Número do WhatsApp
+  const [whatsappNumber, setWhatsappNumber] = useState('');
   const [servicosOferecidos, setServicosOferecidos] = useState('');
   const [pontoDeReferenciaDetalhado, setPontoDeReferenciaDetalhado] = useState('');
 
   // Estados de switches e checkboxes
-  const [hasWhatsApp, setHasWhatsApp] = useState(false); // Telefone para WhatsApp
-  const [is24Hours, setIs24Hours] = useState(false); // Aberto 24 Horas?
+  const [hasWhatsApp, setHasWhatsApp] = useState(false);
+  const [is24Hours, setIs24Hours] = useState(false);
 
   // Estados de localização e imagens
   const [geocodedCoords, setGeocodedCoords] = useState<{ latitude: number; longitude: number } | null>(null);
   const [isGeocoding, setIsGeocoding] = useState(false);
-  const [isSaving, setIsSaving] = useState(false); // Para indicar que está salvando (mock)
+  const [isSaving, setIsSaving] = useState(false); // Indica se o processo de salvamento está ativo
   const [selectedImages, setSelectedImages] = useState<ImagePicker.ImagePickerAsset[]>([]);
 
-  // Campos intermediários para geocodificação (preenchidos pelo ViaCEP)
-  const [logradouroViaCep, setLogradouroViaCep] = useState('');
-  const [bairroViaCep, setBairroViaCep] = useState('');
-  const [cidadeViaCep, setCidadeViaCep] = useState('');
-  const [estadoViaCep, setEstadoViaCep] = useState('');
+  // Campos intermediários preenchidos pelo ViaCEP, que serão enviados ao backend
+  const [logradouroViaCep, setLogradouroViaCep] = useState(''); // Corresponde a 'rua' no backend
+  const [bairroViaCep, setBairroViaCep] = useState('');       // Corresponde a 'bairro' no backend
+  const [cidadeViaCep, setCidadeViaCep] = useState('');       // Corresponde a 'cidade' no backend
+  const [estadoViaCep, setEstadoViaCep] = useState('');       // Corresponde a 'uf' no backend
 
-  // Efeito para solicitar permissão da galeria
+  // Efeito para solicitar permissão da galeria ao iniciar a tela
   useEffect(() => {
     (async () => {
       if (Platform.OS !== 'web') {
@@ -55,7 +68,7 @@ export const AddLocationScreen: React.FC<AddLocationScreenProps> = ({ onGoBack, 
     })();
   }, []);
 
-  // Efeito para geocodificar o endereço completo quando os campos mudam
+  // Efeito para geocodificar o endereço (a chamada será via botão, não automática)
   useEffect(() => {
     // A geocodificação automática pode ser pesada ou falhar com endereços parciais.
     // É melhor ter um botão manual para "Geocodificar".
@@ -63,6 +76,7 @@ export const AddLocationScreen: React.FC<AddLocationScreenProps> = ({ onGoBack, 
   }, [logradouroViaCep, numero, bairroViaCep, cidadeViaCep, estadoViaCep]);
 
 
+  // Função para buscar o CEP e preencher os campos de endereço
   const handleCEPChange = async (text: string) => {
     setCep(text);
     if (text.length === 8) {
@@ -71,17 +85,18 @@ export const AddLocationScreen: React.FC<AddLocationScreenProps> = ({ onGoBack, 
         const data = await response.json();
         if (data.erro) {
           Alert.alert('Erro', 'CEP não encontrado.');
+          // Limpa todos os campos relacionados ao endereço se o CEP for inválido
           setLogradouroViaCep('');
           setBairroViaCep('');
           setCidadeViaCep('');
           setEstadoViaCep('');
-          setEnderecoCompleto(''); // Limpa o campo combinado
+          setEnderecoCompleto('');
         } else {
           setLogradouroViaCep(data.logradouro);
           setBairroViaCep(data.bairro);
           setCidadeViaCep(data.localidade);
           setEstadoViaCep(data.uf);
-          // Atualiza o campo de endereço completo automaticamente
+          // Atualiza o campo de endereço completo para exibição
           setEnderecoCompleto(`${data.logradouro}, ${data.bairro}, ${data.localidade} - ${data.uf}`);
         }
       } catch (error) {
@@ -91,12 +106,14 @@ export const AddLocationScreen: React.FC<AddLocationScreenProps> = ({ onGoBack, 
     }
   };
 
+  // Função para geocodificar o endereço (obter latitude e longitude)
   const geocodeAddress = useCallback(async () => {
-    // Agora usando os campos do formulário para montar o endereço para geocodificação
-    const fullAddressToGeocode = `${enderecoCompleto}, ${numero}, Brasil`; // `enderecoCompleto` já inclui cidade e estado
+    // Monta o endereço completo usando os campos do ViaCEP para maior precisão
+    const fullAddressToGeocode = `${logradouroViaCep}, ${numero}, ${bairroViaCep}, ${cidadeViaCep}, ${estadoViaCep}, Brasil`;
 
-    if (!fullAddressToGeocode || !nomeLocal) { // Nome do local também é bom para a geocodificação
-      Alert.alert('Campos Incompletos', 'Preencha Nome do Local, Endereço e Número para geocodificar.');
+    // Validação para garantir que os campos necessários para geocodificação estão preenchidos
+    if (!nomeLocal.trim() || !logradouroViaCep.trim() || !numero.trim() || !bairroViaCep.trim() || !cidadeViaCep.trim() || !estadoViaCep.trim()) {
+      Alert.alert('Campos Incompletos', 'Por favor, preencha Nome do Local, CEP, Número e aguarde o preenchimento automático do endereço antes de geocodificar.');
       return;
     }
 
@@ -116,8 +133,9 @@ export const AddLocationScreen: React.FC<AddLocationScreenProps> = ({ onGoBack, 
     } finally {
       setIsGeocoding(false);
     }
-  }, [nomeLocal, enderecoCompleto, numero]); // Dependências da geocodificação
+  }, [nomeLocal, logradouroViaCep, numero, bairroViaCep, cidadeViaCep, estadoViaCep]);
 
+  // Função para selecionar imagens da galeria
   const pickImage = async () => {
     let result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
@@ -135,16 +153,19 @@ export const AddLocationScreen: React.FC<AddLocationScreenProps> = ({ onGoBack, 
     }
   };
 
+  // Função para remover uma imagem selecionada
   const removeImage = (uriToRemove: string) => {
     setSelectedImages(prevImages => prevImages.filter(image => image.uri !== uriToRemove));
   };
 
 
+  // FUNÇÃO PRINCIPAL: Lidar com o salvamento do local (enviar para o backend)
   const handleSaveLocation = async () => {
-    // VALIDAÇÃO BÁSICA DOS CAMPOS OBRIGATÓRIOS
-    if (!nomeLocal.trim() || !cep.trim() || !numero.trim() || !enderecoCompleto.trim() ||
+    // VALIDAÇÃO DOS CAMPOS OBRIGATÓRIOS ANTES DE ENVIAR
+    if (!nomeLocal.trim() || !cep.trim() || !numero.trim() || !logradouroViaCep.trim() ||
+        !bairroViaCep.trim() || !cidadeViaCep.trim() || !estadoViaCep.trim() ||
         !telefoneObrigatorio.trim() || !geocodedCoords) {
-      Alert.alert('Campos Faltando', 'Por favor, preencha todos os campos obrigatórios e geocodifique o endereço antes de salvar.');
+      Alert.alert('Campos Faltando', 'Por favor, preencha todos os campos obrigatórios, preencha o CEP e geocodifique o endereço antes de salvar.');
       return;
     }
 
@@ -153,68 +174,64 @@ export const AddLocationScreen: React.FC<AddLocationScreenProps> = ({ onGoBack, 
         return;
     }
 
-    setIsSaving(true);
+    setIsSaving(true); // Ativa o indicador de salvamento
     let imageUrls: string[] = [];
 
     try {
-      // *** ESTE TRECHO ABAIXO VAI PRECISAR SER MODIFICADO PARA SEU BACKEND PHP/MYSQL ***
-      // Por enquanto, ele apenas simula o processo ou se usaria o Firebase se ainda estivesse ativo.
-      // O objetivo agora é capturar os dados para o backend entender.
-
-      // Simulando upload de imagens para um serviço de armazenamento (e.g., Cloudinary, S3, ou seu próprio backend)
-      // Para o backend, você enviaria cada imagem para um endpoint de upload e coletaria as URLs.
-      // Por agora, vamos simular URLs para o mock de dados:
-      imageUrls = selectedImages.map((img, index) => `http://mock-server.com/images/<span class="math-inline">\{nomeLocal\.replace\(/\\s/g, '\_'\)\}\_</span>{index}.jpg`);
+      // Em um cenário real, as imagens seriam enviadas para um serviço de armazenamento
+      // (como Cloudinary, AWS S3, ou um endpoint de upload no seu próprio backend)
+      // e você coletaria as URLs públicas aqui.
+      // Por enquanto, estamos apenas coletando as URIs locais das imagens selecionadas.
+      // O backend espera um array de strings para fotos_local_json.
+      imageUrls = selectedImages.map(img => img.uri);
 
 
-      const newShop: Omit<TireShop, 'id'> = {
-        name: nomeLocal,
-        type: 'Borracharia/Oficina', // Definido como padrão por enquanto, pode ser um campo dropdown futuro
-        address: `${enderecoCompleto}, ${numero}`, // Endereço formatado para exibição
-        cep: cep,
-        number: numero,
+      // PREPARAÇÃO DOS DADOS PARA O BACKEND
+      // O objeto `dataToSend` é mapeado diretamente para os nomes das colunas
+      // da sua tabela `borracharias_oficinas` e os parâmetros esperados pelo seu backend Node.js.
+      const dataToSend = {
+        nome_local: nomeLocal.trim(),
+        cep: cep.trim(),
+        numero_endereco: numero.trim(),
+        rua: logradouroViaCep.trim(), // Usando o logradouro do ViaCEP
+        bairro: bairroViaCep.trim(),   // Usando o bairro do ViaCEP
+        cidade: cidadeViaCep.trim(),   // Usando a cidade do ViaCEP
+        uf: estadoViaCep.trim(),       // Usando o estado do ViaCEP
+        ponto_referencia_simplificado: pontoDeReferenciaSimplificado.trim() || null, // Se vazio, envia null
+        telefone: telefoneObrigatorio.trim(),
+        telefone_whatsapp: hasWhatsApp, // Booleano (true/false)
+        whatsapp_number: hasWhatsApp ? whatsappNumber.trim() : null, // Se não tem WhatsApp, envia null
+        aberto_24_horas: is24Hours, // Booleano (true/false)
+        servicos_oferecidos: servicosOferecidos.trim() || null, // Se vazio, envia null
+        ponto_referencia_detalhado: pontoDeReferenciaDetalhado.trim() || null, // Se vazio, envia null
+        fotos_local_json: imageUrls, // Array de URIs das imagens (o backend fará JSON.stringify)
         latitude: geocodedCoords.latitude,
         longitude: geocodedCoords.longitude,
-        simplifiedReferencePoint: pontoDeReferenciaSimplificado.trim() || undefined,
-        phone: telefoneObrigatorio.trim(),
-        hasWhatsApp: hasWhatsApp,
-        whatsappNumber: hasWhatsApp ? whatsappNumber.trim() : undefined,
-        is24Hours: is24Hours,
-        servicesOffered: servicosOferecidos.trim() || undefined,
-        detailedReferencePoint: pontoDeReferenciaDetalhado.trim() || undefined,
-        images: imageUrls.length > 0 ? imageUrls : undefined,
-        createdAt: new Date(), // Simula timestamp
-        addedBy: 'frontend_user_mock', // Placeholder para o backend gerenciar a autenticação real
       };
 
-      console.log("Dados da Nova Borracharia para Backend:", JSON.stringify(newShop, null, 2));
+      console.log("Dados para o Backend:", JSON.stringify(dataToSend, null, 2));
 
-      // *** AQUI VOCÊ FARIA A REQUISIÇÃO POST PARA SEU BACKEND PHP/MYSQL ***
-      // Exemplo (usando fetch, precisaria da URL correta da sua API):
-      /*
-      const response = await fetch('http://YOUR_BACKEND_IP_OR_DOMAIN/api/v1/tire_shops', {
+      // REALIZANDO A REQUISIÇÃO POST PARA O BACKEND NODE.JS
+      const response = await fetch(`${API_BASE_URL}/cadastro`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          // 'Authorization': 'Bearer seu_token_aqui' // Se seu backend tiver autenticação
+          'Content-Type': 'application/json', // Informa ao backend que estamos enviando JSON
+          // 'Authorization': 'Bearer seu_token_aqui' // Adicione se seu backend tiver autenticação
         },
-        body: JSON.stringify(newShop),
+        body: JSON.stringify(dataToSend), // Converte o objeto JavaScript para uma string JSON
       });
 
+      // Verifica se a resposta do servidor foi bem-sucedida (status 2xx)
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Erro ao salvar no backend');
+        const errorData = await response.json(); // Tenta ler a mensagem de erro do backend
+        throw new Error(errorData.message || 'Erro ao salvar no backend');
       }
 
-      const responseData = await response.json();
+      const responseData = await response.json(); // Lê a resposta de sucesso do backend
       console.log('Resposta do Backend:', responseData);
-      */
 
-      // Simulando o tempo de salvamento
-      await new Promise(resolve => setTimeout(resolve, 2000));
-
-      Alert.alert('Sucesso!', 'Local cadastrado com sucesso! (Dados prontos para o Backend)');
-      // Limpa os campos após o sucesso (opcional)
+      // Exibe mensagem de sucesso e limpa o formulário
+      Alert.alert('Sucesso!', 'Local cadastrado com sucesso!');
       setNomeLocal('');
       setCep('');
       setNumero('');
@@ -228,13 +245,17 @@ export const AddLocationScreen: React.FC<AddLocationScreenProps> = ({ onGoBack, 
       setPontoDeReferenciaDetalhado('');
       setGeocodedCoords(null);
       setSelectedImages([]);
+      setLogradouroViaCep('');
+      setBairroViaCep('');
+      setCidadeViaCep('');
+      setEstadoViaCep('');
 
-      onLocationAdded(); // Retorna para a tela principal (ou apenas navega para onde for apropriado)
+      onLocationAdded(); // Chama a função de callback para indicar que o local foi adicionado
     } catch (error) {
-      console.error('Erro ao preparar ou salvar local:', error);
+      console.error('Erro ao salvar local:', error);
       Alert.alert('Erro', `Não foi possível cadastrar o local: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
     } finally {
-      setIsSaving(false);
+      setIsSaving(false); // Desativa o indicador de salvamento
     }
   };
 
@@ -270,6 +291,7 @@ export const AddLocationScreen: React.FC<AddLocationScreenProps> = ({ onGoBack, 
       />
 
       <Text style={styles.label}>Endereço (Rua, Bairro, Cidade - UF)</Text>
+      {/* Este campo é preenchido automaticamente pelo CEP e pode ser editado */}
       <TextInput
         style={styles.input}
         placeholder="Preenchido automaticamente pelo CEP"
@@ -277,16 +299,16 @@ export const AddLocationScreen: React.FC<AddLocationScreenProps> = ({ onGoBack, 
         onChangeText={setEnderecoCompleto} // Permite edição manual se o usuário quiser ajustar
       />
       <TouchableOpacity
-            style={styles.geocodeButton}
-            onPress={geocodeAddress}
-            disabled={isGeocoding}
-          >
-            {isGeocoding ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={styles.geocodeButtonText}>Geocodificar Endereço</Text>
-            )}
-          </TouchableOpacity>
+        style={styles.geocodeButton}
+        onPress={geocodeAddress}
+        disabled={isGeocoding}
+      >
+        {isGeocoding ? (
+          <ActivityIndicator color="#fff" />
+        ) : (
+          <Text style={styles.geocodeButtonText}>Geocodificar Endereço</Text>
+        )}
+      </TouchableOpacity>
 
       {geocodedCoords && (
         <Text style={styles.coordsText}>

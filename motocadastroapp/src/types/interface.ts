@@ -1,22 +1,33 @@
 // src/types/interface.ts
 
+// Esta interface deve corresponder EXATAMENTE aos nomes das colunas do seu banco de dados
+// e aos dados retornados pelo seu backend Node.js no endpoint /locais.
 export interface TireShop {
-  id: string; // ID do documento (para o MySQL, será o ID da tabela)
-  name: string; // Nome do Local
-  type: string; // Tipo (Ex: "Borracharia", "Oficina")
-  address: string; // Endereço completo formatado (Rua, Bairro, Cidade - UF)
+  id: number;
+  nome_local: string; // Corresponde a 'name' no mock, mas vem como 'nome_local' do DB
+  cep: string;
+  numero_endereco: string;
+  rua: string;
+  bairro: string;
+  cidade: string;
+  uf: string;
   latitude: number;
   longitude: number;
-  cep: string; // CEP
-  number: string; // Número do endereço
-  simplifiedReferencePoint?: string; // Ponto de Referência Simplificado
-  phone: string; // Telefone (Obrigatório)
-  hasWhatsApp?: boolean; // Se o telefone tem WhatsApp (true/false)
-  whatsappNumber?: string; // Número do WhatsApp (visível se hasWhatsApp for true)
-  is24Hours?: boolean; // Aberto 24 Horas? (true/false)
-  servicesOffered?: string; // Serviços Oferecidos (texto multiline)
-  detailedReferencePoint?: string; // Ponto de Referência Detalhado (texto multiline)
-  images?: string[]; // Array de URLs das imagens (serão URLs do seu servidor/cloud)
-  createdAt?: Date; // Timestamp de criação (gerado pelo backend)
-  addedBy?: string; // ID do usuário que adicionou (gerado/validado pelo backend)
+  ponto_referencia_simplificado: string | null;
+  telefone: string;
+  telefone_whatsapp: number; // 0 ou 1 do MySQL
+  numero_whatsapp: string | null; // A nova coluna para o número do WhatsApp
+  aberto_24_horas: number; // 0 ou 1 do MySQL
+  servicos_oferecidos: string | null;
+  ponto_referencia_detalhado: string | null;
+  fotos_local_json: string; // Vem como string JSON do MySQL, precisará de JSON.parse()
+  data_cadastro: string; // Timestamp do MySQL
+  // Removi os campos 'name', 'address', 'type', 'phone', 'hasWhatsApp', 'whatsappNumber', 'is24Hours', 'servicesOffered', 'detailedReferencePoint', 'simplifiedReferencePoint', 'images', 'createdAt', 'addedBy'
+  // que eram do mock ou da interface anterior e não batem com o DB diretamente.
+}
+
+// Definindo a interface para as coordenadas de localização (apenas latitude e longitude)
+export interface LocationCoords {
+  latitude: number;
+  longitude: number;
 }

@@ -1,23 +1,17 @@
 // src/components/MapSection.tsx
 
 import React from 'react';
-import { View, StyleSheet, ActivityIndicator, Text } from 'react-native';
-import MapView, { Marker, Region } from 'react-native-maps'; // Importe Region
+import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
+import MapView, { Marker, Region } from 'react-native-maps';
 import { MaterialIcons } from '@expo/vector-icons';
-import { TireShop } from '../types/interface'; // Certifique-se de que o TireShop está importado
-
-// Definindo a interface para as coordenadas de localização (apenas latitude e longitude)
-interface LocationCoords {
-  latitude: number;
-  longitude: number;
-}
+import { TireShop, LocationCoords } from '../types/interface'; // Importa TireShop e LocationCoords
 
 interface MapSectionProps {
-  themeColors: any; // Ajuste para um tipo mais específico se ThemeColors for uma interface
-  currentLocationCoords: LocationCoords | null; // Pode ser null no início
-  mapRegion: Region | null; // <--- MUDANÇA AQUI: Agora aceita null!
-  userLocation: any; // Tipo mais específico se souber o formato exato de Location.LocationObject
-  locaisProximos: TireShop[];
+  themeColors: any;
+  currentLocationCoords: LocationCoords | null;
+  mapRegion: Region | null;
+  userLocation: any; // Mantenha 'any' se o tipo completo de Location.LocationObject não for necessário aqui
+  locaisProximos: TireShop[]; // Agora virão do backend
   locationErrorMsg: string | null;
 }
 
@@ -29,59 +23,67 @@ export const MapSection: React.FC<MapSectionProps> = ({
   locaisProximos,
   locationErrorMsg,
 }) => {
+  if (locationErrorMsg) {
+    return (
+      <View style={[styles.mapContainer, { backgroundColor: themeColors.cardBackground }]}>
+        <Text style={[styles.errorText, { color: themeColors.errorText }]}>
+          {locationErrorMsg}
+        </Text>
+      </View>
+    );
+  }
+
+  if (!mapRegion || !currentLocationCoords) {
+    return (
+      <View style={[styles.mapContainer, { backgroundColor: themeColors.cardBackground }]}>
+        <ActivityIndicator size="large" color="#007BFF" />
+        <Text style={[styles.loadingText, { color: themeColors.subText }]}>
+          Carregando mapa e localização...
+        </Text>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.mapContainer}>
-      {locationErrorMsg ? (
-        <View style={styles.errorContainer}>
-          <Text style={[styles.errorText, { color: themeColors.errorText }]}>
-            {locationErrorMsg}
-          </Text>
-        </View>
-      ) : !currentLocationCoords || !mapRegion ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={themeColors.primary} />
-          <Text style={[styles.loadingText, { color: themeColors.text }]}>
-            Carregando localização e locais próximos...
-          </Text>
-        </View>
-      ) : (
-        <MapView
-          style={styles.map}
-          region={mapRegion} // mapRegion agora pode ser null, mas o componente MapView já lida com isso se a região for válida
-          showsUserLocation={true}
-          loadingEnabled={true}
-          // initialRegion={mapRegion} // Pode usar initialRegion se a região for estática, mas region é melhor para estado mutável
-        >
-          {/* Marcador da localização atual do usuário (já coberto por showsUserLocation) */}
-          {/* {userLocation && (
-            <Marker
-              coordinate={{
-                latitude: userLocation.coords.latitude,
-                longitude: userLocation.coords.longitude,
-              }}
-              title="Sua Localização"
-              description="Você está aqui"
-            >
-              <MaterialIcons name="person-pin-circle" size={30} color="#007BFF" />
-            </Marker>
-          )} */}
+      <MapView
+        style={styles.map}
+        initialRegion={mapRegion}
+        showsUserLocation={true}
+        followsUserLocation={true}
+        loadingEnabled={true}
+        loadingIndicatorColor="#007BFF"
+        loadingBackgroundColor={themeColors.cardBackground}
+      >
+        {/* Marcador para a localização do usuário (se não for mostrado por showsUserLocation) */}
+        {/* {userLocation && (
+          <Marker
+            coordinate={{
+              latitude: userLocation.coords.latitude,
+              longitude: userLocation.coords.longitude,
+            }}
+            title="Sua Localização"
+            description="Você está aqui"
+          >
+            <MaterialIcons name="person-pin-circle" size={30} color="#007BFF" />
+          </Marker>
+        )} */}
 
-          {/* Marcadores dos locais próximos */}
-          {locaisProximos.map((local) => (
-            <Marker
-              key={local.id}
-              coordinate={{
-                latitude: local.latitude,
-                longitude: local.longitude,
-              }}
-              title={local.name}
-              description={local.address}
-            >
-              <MaterialIcons name="place" size={30} color="#28A745" /> {/* Ícone para as borracharias */}
-            </Marker>
-          ))}
-        </MapView>
-      )}
+        {/* Marcadores dos Locais próximos */}
+        {locaisProximos.map((local) => (
+          <Marker
+            key={local.id.toString()} // keyExtractor precisa de string
+            coordinate={{
+              latitude: local.latitude,
+              longitude: local.longitude,
+            }}
+            title={local.nome_local} // Usando 'nome_local' do DB
+            description={`${local.rua}, ${local.numero_endereco}, ${local.bairro}, ${local.cidade} - ${local.uf}`} // Construindo o endereço
+          >
+            <MaterialIcons name="place" size={30} color="#28A745" />
+          </Marker>
+        ))}
+      </MapView>
     </View>
   );
 };
@@ -92,37 +94,25 @@ const styles = StyleSheet.create({
     height: 300, // Altura fixa para o mapa
     borderRadius: 10,
     overflow: 'hidden',
-    marginTop: 10,
-    marginBottom: 20,
-    borderWidth: 1,
-    borderColor: '#ddd',
+    marginTop: 15,
     alignItems: 'center',
     justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   map: {
     width: '100%',
     height: '100%',
   },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#f0f0f0', // Cor de fundo para o estado de carregamento
-  },
   loadingText: {
     marginTop: 10,
     fontSize: 16,
   },
-  errorContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#ffe0e0', // Fundo vermelho claro para erro
-  },
   errorText: {
     fontSize: 16,
-    fontWeight: 'bold',
     textAlign: 'center',
-    marginHorizontal: 20,
   },
 });

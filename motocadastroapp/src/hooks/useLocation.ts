@@ -2,130 +2,110 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import * as Location from 'expo-location';
-import { TireShop } from '../types/interface'; // Importa o tipo TireShop
+import { TireShop, LocationCoords } from '../types/interface'; // Importa o tipo TireShop e LocationCoords
+
+// Defina a URL base do seu backend aqui.
+// IMPORTANTE:
+// - Para emuladores Android, use 'http://10.0.2.2:3000'
+// - Para dispositivos físicos (celular real), use o ENDEREÇO IP DA SUA MÁQUINA
+//   na rede local (ex: 'http://192.168.1.14:3000').
+//   Certifique-se de que seu celular e computador estejam na mesma rede Wi-Fi.
+const API_BASE_URL = 'http://192.168.1.14:3000'; // AJUSTE AQUI: Use o IP da sua máquina ou o do emulador
 
 interface LocationHook {
-  currentLocationCoords: { latitude: number; longitude: number } | null;
+  currentLocationCoords: LocationCoords | null;
   mapRegion: { latitude: number; longitude: number; latitudeDelta: number; longitudeDelta: number } | null;
   userLocation: Location.LocationObject | null;
   locationErrorMsg: string | null;
-  locaisProximos: TireShop[]; // Agora será populado via API ou mock local
+  locaisProximos: TireShop[];
   expandedNearbyPlaces: boolean;
   toggleNearbyPlaces: () => void;
   isLoadingLocationAndShops: boolean;
-  // Não teremos mais fetchTireShops aqui diretamente para o banco de dados
-  // fetchTireShops: () => Promise<void>; // Removido ou reescrito para API
+  // Agora, podemos adicionar uma função para recarregar os locais, se necessário
+  // reloadLocais: () => void; // Adicionei para permitir recarregar a lista
 }
 
 export const useLocation = (): LocationHook => {
-  const [currentLocationCoords, setCurrentLocationCoords] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [currentLocationCoords, setCurrentLocationCoords] = useState<LocationCoords | null>(null);
   const [mapRegion, setMapRegion] = useState<{ latitude: number; longitude: number; latitudeDelta: number; longitudeDelta: number } | null>(null);
   const [userLocation, setUserLocation] = useState<Location.LocationObject | null>(null);
   const [locationErrorMsg, setLocationErrorMsg] = useState<string | null>(null);
-  const [locaisProximos, setLocaisProximos] = useState<TireShop[]>([]); // Será preenchido por requisição a sua API
+  const [locaisProximos, setLocaisProximos] = useState<TireShop[]>([]);
   const [expandedNearbyPlaces, setExpandedNearbyPlaces] = useState(false);
-  const [isLoadingLocationAndShops, setIsLoadingLocationAndShops] = useState(true); // Controla o loading
+  const [isLoadingLocationAndShops, setIsLoadingLocationAndShops] = useState(true);
 
+  // Função para alternar a expansão da seção "Locais Próximos"
   const toggleNearbyPlaces = useCallback(() => {
     setExpandedNearbyPlaces(prev => !prev);
   }, []);
 
-  // Função para buscar a localização do usuário
-  useEffect(() => {
-    (async () => {
-      let { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        setLocationErrorMsg('Permissão para acessar a localização foi negada.');
-        setIsLoadingLocationAndShops(false);
-        return;
+  // FUNÇÃO PRINCIPAL: Buscar os locais do backend
+  const fetchLocaisFromBackend = useCallback(async () => {
+    setIsLoadingLocationAndShops(true); // Ativa o loading
+    setLocationErrorMsg(null); // Limpa erros anteriores
+    try {
+      const response = await fetch(`${API_BASE_URL}/locais`);
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Erro ao buscar locais do backend.');
       }
 
-      let location = await Location.getCurrentPositionAsync({});
-      setUserLocation(location);
-      setCurrentLocationCoords({
-        latitude: location.coords.latitude,
-        longitude: location.coords.longitude,
-      });
-      setMapRegion({
-        latitude: location.coords.latitude,
-        longitude: location.coords.longitude,
-        latitudeDelta: 0.0922,
-        longitudeDelta: 0.0421,
-      });
-      // Uma vez que a localização é obtida, agora simularíamos a busca das lojas
-      // ou a HomeScreen chamaria a API.
-      simulateFetchTireShopsFromAPI(); // Simula a busca de lojas após obter a localização
-    })();
-  }, []); // Executa apenas uma vez ao montar
+      const responseData = await response.json();
+      
+      // CONVERSÃO CRUCIAL: Mapeia os dados recebidos e converte latitude/longitude para números
+      const convertedLocais: TireShop[] = responseData.data.map((local: any) => ({
+        ...local,
+        latitude: parseFloat(local.latitude), // Converte para número
+        longitude: parseFloat(local.longitude), // Converte para número
+      }));
 
-  // SIMULAÇÃO: Como as lojas viriam de uma API (para preencher locaisProximos)
-  const simulateFetchTireShopsFromAPI = useCallback(async () => {
-    setIsLoadingLocationAndShops(true);
-    try {
-      // *** AQUI VOCÊ FARIA A REQUISIÇÃO GET PARA SEU BACKEND PHP/MYSQL ***
-      // Exemplo: const response = await fetch('http://YOUR_BACKEND_IP_OR_DOMAIN/api/v1/tire_shops');
-      // const data = await response.json();
-      // setLocaisProximos(data);
-
-      // Por enquanto, vamos usar dados mockados para o frontend funcionar
-      const mockData: TireShop[] = [
-        {
-          id: 'mock1',
-          name: 'Borracharia Central (Mock)',
-          type: 'Borracharia',
-          address: 'Rua da Saudade, 100, Boa Vista, Recife - PE',
-          latitude: -8.0577, // Proximidade de Jaboatão
-          longitude: -34.8827,
-          cep: '50050000',
-          number: '100',
-          phone: '81911112222',
-          is24Hours: true,
-          images: ['https://via.placeholder.com/150/0000FF/FFFFFF?text=BC1', 'https://via.placeholder.com/150/FF0000/FFFFFF?text=BC2'],
-          servicesOffered: 'Conserto de pneus, Venda de pneus novos, Balanceamento',
-        },
-        {
-          id: 'mock2',
-          name: 'Oficina Rápida (Mock)',
-          type: 'Oficina',
-          address: 'Av. Caxangá, 200, Caxangá, Recife - PE',
-          latitude: -8.0490,
-          longitude: -34.9358,
-          cep: '50710000',
-          number: '200',
-          phone: '81933334444',
-          is24Hours: false,
-          images: ['https://via.placeholder.com/150/00FF00/000000?text=OR1'],
-          servicesOffered: 'Troca de óleo, Alinhamento e balanceamento',
-        },
-        {
-            id: 'mock3',
-            name: 'Borracharia do Zé (Mock)',
-            type: 'Borracharia',
-            address: 'Rua do Sol, 50, Piedade, Jaboatão dos Guararapes - PE',
-            latitude: -8.1738,
-            longitude: -34.9080,
-            cep: '54400000',
-            number: '50',
-            phone: '81955556666',
-            is24Hours: true,
-            hasWhatsApp: true,
-            whatsappNumber: '81955556666',
-            images: ['https://via.placeholder.com/150/FF00FF/000000?text=BZ1'],
-            servicesOffered: 'Recapagem, Borracharia móvel',
-            simplifiedReferencePoint: 'Esquina com a Avenida Principal',
-            detailedReferencePoint: 'Prédio azul, portão grande de metal, em frente à loja de conveniência.'
-        }
-      ];
-      setLocaisProximos(mockData);
-
-    } catch (error) {
-      console.error("Erro ao buscar locais (simulado):", error);
-      setLocationErrorMsg("Erro ao carregar locais do servidor.");
+      setLocaisProximos(convertedLocais); // Atualiza o estado com os dados convertidos
+    } catch (err: any) {
+      console.error('Erro ao buscar locais do backend:', err);
+      setLocationErrorMsg(`Não foi possível carregar os locais: ${err.message}`);
+      // Alert.alert('Erro', `Não foi possível carregar os locais: ${err.message}`); // Evitar muitos alerts em hooks
     } finally {
-      setIsLoadingLocationAndShops(false);
+      setIsLoadingLocationAndShops(false); // Desativa o loading
     }
-  }, []);
+  }, []); // Sem dependências, pois API_BASE_URL é constante
 
+  // Efeito para buscar a localização do usuário e, em seguida, os locais do backend
+  useEffect(() => {
+    const initializeData = async () => {
+      setIsLoadingLocationAndShops(true); // Inicia o loading para ambas as operações
+
+      // 1. Buscar localização do usuário
+      let locationStatus = await Location.requestForegroundPermissionsAsync();
+      if (locationStatus.status !== 'granted') {
+        setLocationErrorMsg('Permissão para acessar a localização foi negada.');
+        // Mesmo sem permissão de localização, tentamos carregar as lojas
+      } else {
+        try {
+          let location = await Location.getCurrentPositionAsync({});
+          setUserLocation(location);
+          setCurrentLocationCoords({
+            latitude: location.coords.latitude,
+            longitude: location.coords.longitude,
+          });
+          setMapRegion({
+            latitude: location.coords.latitude,
+            longitude: location.coords.longitude,
+            latitudeDelta: 0.0922,
+            longitudeDelta: 0.0421,
+          });
+        } catch (err) {
+          console.error("Erro ao obter localização:", err);
+          setLocationErrorMsg("Não foi possível obter sua localização atual.");
+        }
+      }
+
+      // 2. Buscar locais do backend (sempre tenta, independentemente da localização)
+      await fetchLocaisFromBackend(); // Chama a função de busca de locais
+    };
+
+    initializeData();
+  }, [fetchLocaisFromBackend]); // Depende de fetchLocaisFromBackend para que seja chamado corretamente
 
   // Retorna os valores e funções que o componente precisa
   return {
@@ -133,9 +113,10 @@ export const useLocation = (): LocationHook => {
     mapRegion,
     userLocation,
     locationErrorMsg,
-    locaisProximos,
+    locaisProximos, // Agora contém os dados reais do backend
     expandedNearbyPlaces,
     toggleNearbyPlaces,
     isLoadingLocationAndShops,
+    // reloadLocais: fetchLocaisFromBackend, // Expor a função para recarregar a lista, se necessário
   };
 };

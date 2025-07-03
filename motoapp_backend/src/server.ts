@@ -3,13 +3,15 @@
 import express, { Request, Response } from 'express'; // Importado Request e Response para tipagem correta
 import mysql from 'mysql2/promise'; // Usar a versão 'promise' para operações assíncronas com o banco de dados
 import cors from 'cors';
-import dotenv from 'dotenv';
+import dotenv from 'dotenv'; // Importa a biblioteca dotenv
 
-// Carrega as variáveis de ambiente do arquivo .env
+// Carrega as variáveis de ambiente do arquivo .env.
+// Esta linha DEVE ser uma das primeiras para garantir que as variáveis estejam disponíveis.
 dotenv.config();
 
 const app = express();
-const port = process.env.PORT || 3000; // A API vai rodar na porta 3000 por padrão, ou na porta definida em .env
+// A porta é lida de process.env.PORT (do seu .env) ou usa 3000 como padrão
+const port = process.env.PORT || 3000; 
 
 // Middleware para habilitar CORS (Cross-Origin Resource Sharing)
 // Essencial para permitir que seu aplicativo React Native se conecte à API
@@ -26,10 +28,10 @@ app.use(express.json());
 // Configurações do Banco de Dados
 // É altamente recomendado usar variáveis de ambiente para credenciais de produção por segurança
 const dbConfig = {
-  host: process.env.DB_HOST || 'localhost',
-  user: process.env.DB_USER || 'root',
-  password: process.env.DB_PASSWORD || '', // Senha do seu usuário MySQL (vazia se for o padrão do XAMPP)
-  database: process.env.DB_NAME || 'motoapp_db', // O nome do seu banco de dados MySQL
+  host: process.env.DB_HOST || 'localhost', // Lendo do .env ou padrão
+  user: process.env.DB_USER || 'root',     // Lendo do .env ou padrão
+  password: process.env.DB_PASSWORD || '', // Lendo do .env ou padrão (vazio para XAMPP/WAMP padrão)
+  database: process.env.DB_NAME || 'motoapp_db', // Lendo do .env ou padrão
 };
 
 let pool: mysql.Pool; // Declaração do pool de conexão com o banco de dados
@@ -84,7 +86,8 @@ app.post('/cadastro', async (req: express.Request, res: express.Response) => { /
       INSERT INTO borracharias_oficinas (
         nome_local, cep, numero_endereco, rua, bairro, cidade, uf,
         ponto_referencia_simplificado, telefone, telefone_whatsapp,
-        whatsapp_number, aberto_24_horas, servicos_oferecidos,
+        numero_whatsapp, -- <--- NOME DA COLUNA AJUSTADO AQUI para corresponder ao DB
+        aberto_24_horas, servicos_oferecidos,
         ponto_referencia_detalhado, fotos_local_json, latitude, longitude
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
@@ -109,7 +112,7 @@ app.post('/cadastro', async (req: express.Request, res: express.Response) => { /
       ponto_referencia_simplificado || null, // Se o campo for vazio, salva como NULL no DB
       telefone,
       telefoneWhatsappDb,
-      whatsapp_number || null, // Se o campo for vazio, salva como NULL no DB
+      whatsapp_number || null, // <--- Este valor agora vai para 'numero_whatsapp'
       aberto24HorasDb,
       servicos_oferecidos || null, // Se o campo for vazio, salva como NULL no DB
       ponto_referencia_detalhado || null, // Se o campo for vazio, salva como NULL no DB
@@ -134,6 +137,26 @@ app.post('/cadastro', async (req: express.Request, res: express.Response) => { /
     res.status(500).json({ success: false, message: 'Erro interno do servidor ao cadastrar local.' });
   }
 });
+
+// NOVO ENDPOINT: Para buscar todos os locais cadastrados (GET)
+// Acessível em http://localhost:3000/locais ou http://10.0.2.2:3000/locais
+app.get('/locais', async (req: Request, res: Response) => {
+  try {
+    // Query SQL para selecionar todos os registros da tabela
+    const query = 'SELECT * FROM borracharias_oficinas';
+
+    // Executa a query. O mysql2/promise retorna um array de [rows, fields]
+    const [rows] = await pool.execute(query);
+
+    // Envia os resultados como JSON para o cliente
+    res.status(200).json({ success: true, data: rows });
+
+  } catch (error) {
+    console.error('Erro ao buscar locais:', error);
+    res.status(500).json({ success: false, message: 'Erro interno do servidor ao buscar locais.' });
+  }
+});
+
 
 // Inicia o servidor Express após a inicialização do pool de conexão com o banco de dados
 async function startServer() {

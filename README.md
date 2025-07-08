@@ -51,6 +51,8 @@ Este projeto é dividido em duas partes principais: o Frontend (aplicativo mobil
 * Express.js: Framework web para Node.js, utilizado na construção da API RESTful.
 
 * TypeScript: Linguagem de programação para o desenvolvimento do backend.
+  
+* XAMP: Servidor para o banco de dados.
 
 * MySQL: Sistema de Gerenciamento de Banco de Dados Relacional para armazenar os dados.
 

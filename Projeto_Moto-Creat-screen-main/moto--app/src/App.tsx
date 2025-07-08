@@ -15,8 +15,8 @@ import { NearbyPlacesSection } from './components/NearbyPlacesSection';
 import { MapSection } from './components/MapSection';
 import { BottomNav } from './components/BottomNav';
 
-// Importar types
-import { TireShop } from './types/interface'; // Sua interface existente
+
+import { TireShop } from './types/interface'; 
 
 // Habilitar LayoutAnimation para Android (ainda é um no-op na Nova Arquitetura, mas mantemos por compatibilidade)
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
